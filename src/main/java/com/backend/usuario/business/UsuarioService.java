@@ -3,9 +3,11 @@ package com.backend.usuario.business;
 import com.backend.usuario.business.converter.UsuarioConverter;
 import com.backend.usuario.business.dto.UsuarioDTO;
 import com.backend.usuario.infrastructure.entity.Usuario;
-import com.backend.usuario.infrastructure.repository.EnderecoRepository;
+import com.backend.usuario.infrastructure.exceptions.ConflictException;
+import com.backend.usuario.infrastructure.exceptions.ResourceNotFoundException;
 import com.backend.usuario.infrastructure.repository.UsuarioRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -14,10 +16,37 @@ public class UsuarioService {
 
     private final UsuarioRepository usuarioRepository;
     private final UsuarioConverter usuarioConverter;
+    private final PasswordEncoder passwordEncoder;
 
     public UsuarioDTO salvaUsuario(UsuarioDTO usuarioDTO) {
-        Usuario usuario = usuarioConverter.paraUsuario(usuarioDTO);
-        return usuarioConverter.paraUsuarioDTO(usuarioRepository.save(usuario));
+            emailExiste(usuarioDTO.getEmail());
+            usuarioDTO.setSenha(passwordEncoder.encode(usuarioDTO.getSenha()));
+            Usuario usuario = usuarioConverter.paraUsuario(usuarioDTO);
+            return usuarioConverter.paraUsuarioDTO(usuarioRepository.save(usuario));
+    }
+
+    public void emailExiste(String email) {
+        try {
+            boolean existe = verificaEmailExixstente(email);
+            if (existe) {
+                throw new ConflictException("Email já cadastrado " + email);
+            }
+        } catch (ConflictException e) {
+            throw new ConflictException("Email já cadastrado " + e.getMessage());
+        }
+    }
+
+    public boolean verificaEmailExixstente(String email) {
+        return usuarioRepository.existsByEmail(email);
+    }
+
+    public Usuario BuscarUsuarioPorEmail(String email){
+        return usuarioRepository.findByEmail(email).orElseThrow(
+                () -> new ResourceNotFoundException("Email não encontrado " + email));
+    }
+
+    public void deletaUsuarioPorEmail(String email){
+        usuarioRepository.deleteByEmail(email);
     }
 
 }
